@@ -4,15 +4,17 @@
 
 HOST=$1
 PORT=$2
-CLIENTS=5
+GROUPSIZE=$3
 
-# Start 5 clients.
-for ((a = 1; a <= $CLIENTS; a++))
+# Start client processes.
+for ((a = 1; a < $GROUPSIZE; a++))
 do
 	sleep 0.1s
 	./part_one $HOST $PORT&
 done
+
 # Start the time daemon.
-./part_one $HOST $PORT $CLIENTS
+./part_one $HOST $PORT $GROUPSIZE
+
 # Wait for the programs to converge.
 wait
