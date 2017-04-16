@@ -2,6 +2,7 @@
 	Sabin Raj Tiwari
 	CMSC 621
 	Project 2
+	Assignment 1
 */
 
 /* Include header files. */
@@ -14,7 +15,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <time.h>
 #include <unistd.h>
 
 /* Define global constants. */
@@ -23,24 +23,24 @@
 /* Import namespaces. */
 using namespace std;
 
-/* Structures for the program. */
-
-struct client_data
-{
-	/* Structure that handles the sockets data for the client. */
-	int socket_fd;
-	struct sockaddr_in client_address;
-};
-
 /* Global Variables. */
 int id, clock_count;
 
 /* Get the string value from an int. */
-std::string i_to_s(int value)
+std::string itos(int value)
 {
 	std::stringstream str;
 	str << value;
 	return str.str();
+}
+
+/* Logs a message to cout or cerr. */
+void log(int type, std::string message)
+{
+	if(type == 0)
+		cerr << "[Process " << id << "]" + message + "\n";
+	else
+		cout << "[Process " << id << "]" + message + "\n";
 }
 
 /* Method that performs the time daemon functionality. */
@@ -50,40 +50,37 @@ void daemon(std::string host, int port, int groupsize)
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{
-		cerr << "Error creating UDP socket. Time daemon exiting.\n";
+		log(0, "[Time Daemon] Error creating UDP socket. Exiting...");
 		exit(0);
 	}
 
 	/* Setup the port and the group address. */
-	struct sockaddr_in address;
-	memset(&address, 0, sizeof(address));
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = inet_addr(host.c_str());
-	address.sin_port = htons(port);
+	struct sockaddr_in group_address;
+	memset(&group_address, 0, sizeof(group_address));
+	group_address.sin_family = AF_INET;
+	group_address.sin_addr.s_addr = inet_addr(host.c_str());
+	group_address.sin_port = htons(port);
 
 	/* Send a poll to all the listening clients to send their clocks. */
-	cout << "Time daemon started with clock " << clock_count << "...\n";
+	log(1, "[Time Daemon] Started. Current clock: " + itos(clock_count));
 	int response = clock_count;
-	int w = sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address));
-	if(w < 0)
+	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&group_address, sizeof(group_address)) < 0)
 	{
-		cerr << "Error writing to the socket. Time daemon exiting.\n";
+		log(0, "[Time Daemon] Error writing to the UDP socket. Exiting...");
 		exit(0);
 	}
 
 	/* Loop for all the clients. */
 	struct sockaddr_in in_address;
-	socklen_t address_length;
-	int r, messages = 0, sum = 0;
+	socklen_t address_length = sizeof(in_address);
+	int messages = 0, sum = 0;
 	while(messages < groupsize - 1)
 	{
 		/* Read from the clients. */
-		address_length = sizeof(in_address);
-		r = recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length);
-		if(r < 0)
+		if(recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length) < 0)
 		{
-			cerr << "Error receiving message from sender. Time daemon exiting.\n";
-			exit(1);
+			log(0, "[Time Daemon] Error receiving message. Exiting...");
+			exit(0);
 		}
 		messages++;
 		sum+= response;
@@ -91,11 +88,10 @@ void daemon(std::string host, int port, int groupsize)
 
 	/* Calculate the clock average and update the count for self and send the updated clocks count. */
 	clock_count+= (sum / groupsize);
-	cout << "Time daemon's clock has been updated to: " << clock_count << "\n";
-	sendto(fd, &clock_count, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address));
-	if(w < 0)
+	log(1, "[Time Daemon] Clock updated: " + itos(clock_count));
+	if(sendto(fd, &clock_count, sizeof(int), 0, (struct sockaddr *)&group_address, sizeof(group_address)) < 0)
 	{
-		cerr << "Error writing to the socket. Time daemon exiting.\n";
+		log(0, "[Time Daemon] Error writing multicast. Exiting...");
 		exit(0);
 	}
 
@@ -104,12 +100,11 @@ void daemon(std::string host, int port, int groupsize)
 	while(messages < groupsize - 1)
 	{
 		/* Read from the clients. */
-		address_length = sizeof(address);
-		r = recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length);
-		if(r < 0)
+		address_length = sizeof(in_address);
+		if(recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length) < 0)
 		{
-			cerr << "Error receiving message from sender. Time daemon exiting.\n";
-			exit(1);
+			log(0, "[Time Daemon] Error receiving message. Exiting...");
+			exit(0);
 		}
 		messages++;
 	}
@@ -119,26 +114,24 @@ void daemon(std::string host, int port, int groupsize)
 
 /* Method that performs the function of the client machines that need to be synchronised. */
 void client(std::string host, int port)
-{
-	int fd, b, s, w, r, y;
-	
+{	
 	/* Create the datagram socket and exit if there is an error. */
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{
-		cerr << "Error creating UDP socket. Process " << id << " exiting.\n";
+		log(0, " Error creating UDP socket. Exiting...");
 		exit(0);
 	}
 
 	/* Allow mutiple sockets to use same port. */
-	y = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(y));
-	if(y < 0)
+	uint status = 1;
+	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof(status)) < 0)
 	{
-		cerr << "Error reusing port for UDP socket. Process " << id << " exiting.\n";
+		log(0, " Error reusing port for UDP socket. Exiting...");
 		exit(0);
 	}
 
-	/* Set up the sender addreses. */
+	/* Set up the addreses. */
 	struct sockaddr_in address;
 	memset(&address, 0, sizeof(address));
 	address.sin_family = AF_INET;
@@ -146,63 +139,58 @@ void client(std::string host, int port)
 	address.sin_port = htons(port);
 
 	/* Bind to the receiving address. */
-	b = bind(fd, (struct sockaddr *)&address, sizeof(address));
-	if(b < 0)
+	if(bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		cerr << "Error binding to UDP socket. Process " << id << " exiting.\n";
-		exit(1);
+		log(0, " Error binding to the UDP socket. Exiting...");
+		exit(0);
 	}
 
 	/* Set the ip_mreq information to join the multicast group. */
 	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr(host.c_str());
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	s = setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
-	if(s < 0)
+	if(setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
 	{
-		cerr << "Error joining multicast group. Process " << id << " exiting.\n";
-		exit(1);
+		log(0, " Error joining the multicast group. Exiting...");
+		exit(0);
 	}
 
 	/* Read from the daemon. */
-	cout << "Process " << id << " started with clock " << clock_count << "...\n";
-	socklen_t address_length = sizeof(address);
+	log(1, " Started. Current clock: " + itos(clock_count));
 	int daemon_time;
-	r = recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length);
-	if(r < 0)
+	socklen_t address_length = sizeof(address);
+	if(recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length) < 0)
 	{
-		cerr << "Error receiving message from sender. Process " << id << " exiting.\n";
+		log(0, " Error receiving message from multicast. Exiting...");
 		exit(1);
 	}
 
 	/* Send the clock count to the daemon. */
 	int response = clock_count - daemon_time;
-	cout << "Process " << id << " is sending: " << response << "\n";
-	w = sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address));
-	if(w < 0)
+	log(1, " Sending: " + itos(response));
+	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		cerr << "Error writing to the socket. Process " << id << " exiting.\n";
+		log(0, " Error writing to socket. Exiting...");
 		exit(0);
 	}
 
 	/* Wait for the server to send the updated clock. */
-	r = recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length);
-	if(r < 0)
+	address_length = sizeof(address);
+	if(recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length) < 0)
 	{
-		cerr << "Error receiving message from sender. Process " << id << " exiting.\n";
+		log(0, " Error receiving message from multicast. Exiting...");
 		exit(1);
 	}
 
 	/* Set the client time to the updated time. */
 	clock_count = daemon_time;
-	cout << "Process " << id << " has been updated to: " << clock_count << "\n";
+	log(1, " Clock updated: " + itos(clock_count));
 
 	/* Send the response to the time daemon that the clock has been updated. */
 	response = 1;
-	w = sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address));
-	if(w < 0)
+	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		cerr << "Error writing to the socket. Process " << id << " exiting.\n";
+		log(0, " Error writing to socket. Exiting...");
 		exit(0);
 	}
 

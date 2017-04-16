@@ -6,6 +6,8 @@
 
 I chose to implement each of the assignment in different programs.
 
-### Assigment 1
+### Assignment 1
 
+### Assignment 2
 
+### Assignment 3
