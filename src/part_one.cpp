@@ -37,7 +37,7 @@ std::string itos(int value)
 /* Logs a message to cout or cerr. */
 void log(int type, std::string message)
 {
-	if(type == 0)
+	if(type == 1)
 		cerr << "[Process " << id << "]" + message + "\n";
 	else
 		cout << "[Process " << id << "]" + message + "\n";
@@ -50,8 +50,8 @@ void daemon(std::string host, int port, int groupsize)
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{
-		log(0, "[Time Daemon] Error creating UDP socket. Exiting...");
-		exit(0);
+		log(1, "[Time Daemon] Error creating UDP socket. Exiting...");
+		exit(1);
 	}
 
 	/* Setup the port and the group address. */
@@ -62,12 +62,12 @@ void daemon(std::string host, int port, int groupsize)
 	group_address.sin_port = htons(port);
 
 	/* Send a poll to all the listening clients to send their clocks. */
-	log(1, "[Time Daemon] Started. Current clock: " + itos(clock_count));
+	log(0, "[Time Daemon] Started. Current clock: " + itos(clock_count));
 	int response = clock_count;
 	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&group_address, sizeof(group_address)) < 0)
 	{
-		log(0, "[Time Daemon] Error writing to the UDP socket. Exiting...");
-		exit(0);
+		log(1, "[Time Daemon] Error writing to the UDP socket. Exiting...");
+		exit(1);
 	}
 
 	/* Loop for all the clients. */
@@ -79,8 +79,8 @@ void daemon(std::string host, int port, int groupsize)
 		/* Read from the clients. */
 		if(recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length) < 0)
 		{
-			log(0, "[Time Daemon] Error receiving message. Exiting...");
-			exit(0);
+			log(1, "[Time Daemon] Error receiving message. Exiting...");
+			exit(1);
 		}
 		messages++;
 		sum+= response;
@@ -88,11 +88,11 @@ void daemon(std::string host, int port, int groupsize)
 
 	/* Calculate the clock average and update the count for self and send the updated clocks count. */
 	clock_count+= (sum / groupsize);
-	log(1, "[Time Daemon] Clock updated: " + itos(clock_count));
+	log(0, "[Time Daemon] Clock updated: " + itos(clock_count));
 	if(sendto(fd, &clock_count, sizeof(int), 0, (struct sockaddr *)&group_address, sizeof(group_address)) < 0)
 	{
-		log(0, "[Time Daemon] Error writing multicast. Exiting...");
-		exit(0);
+		log(1, "[Time Daemon] Error writing multicast. Exiting...");
+		exit(1);
 	}
 
 	/* Wait for acknowledgements from the clients that updates were done before closing socket. */
@@ -103,8 +103,8 @@ void daemon(std::string host, int port, int groupsize)
 		address_length = sizeof(in_address);
 		if(recvfrom(fd, &response, sizeof(int), 0, (struct sockaddr *)&in_address, &address_length) < 0)
 		{
-			log(0, "[Time Daemon] Error receiving message. Exiting...");
-			exit(0);
+			log(1, "[Time Daemon] Error receiving message. Exiting...");
+			exit(1);
 		}
 		messages++;
 	}
@@ -119,16 +119,16 @@ void client(std::string host, int port)
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{
-		log(0, " Error creating UDP socket. Exiting...");
-		exit(0);
+		log(1, " Error creating UDP socket. Exiting...");
+		exit(1);
 	}
 
 	/* Allow mutiple sockets to use same port. */
 	uint status = 1;
 	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof(status)) < 0)
 	{
-		log(0, " Error reusing port for UDP socket. Exiting...");
-		exit(0);
+		log(1, " Error reusing port for UDP socket. Exiting...");
+		exit(1);
 	}
 
 	/* Set up the addreses. */
@@ -141,8 +141,8 @@ void client(std::string host, int port)
 	/* Bind to the receiving address. */
 	if(bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		log(0, " Error binding to the UDP socket. Exiting...");
-		exit(0);
+		log(1, " Error binding to the UDP socket. Exiting...");
+		exit(1);
 	}
 
 	/* Set the ip_mreq information to join the multicast group. */
@@ -151,47 +151,47 @@ void client(std::string host, int port)
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 	if(setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
 	{
-		log(0, " Error joining the multicast group. Exiting...");
-		exit(0);
+		log(1, " Error joining the multicast group. Exiting...");
+		exit(1);
 	}
 
 	/* Read from the daemon. */
-	log(1, " Started. Current clock: " + itos(clock_count));
+	log(0, " Started. Current clock: " + itos(clock_count));
 	int daemon_time;
 	socklen_t address_length = sizeof(address);
 	if(recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length) < 0)
 	{
-		log(0, " Error receiving message from multicast. Exiting...");
+		log(1, " Error receiving message from multicast. Exiting...");
 		exit(1);
 	}
 
 	/* Send the clock count to the daemon. */
 	int response = clock_count - daemon_time;
-	log(1, " Sending: " + itos(response));
+	log(0, " Sending: " + itos(response));
 	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		log(0, " Error writing to socket. Exiting...");
-		exit(0);
+		log(1, " Error writing to socket. Exiting...");
+		exit(1);
 	}
 
 	/* Wait for the server to send the updated clock. */
 	address_length = sizeof(address);
 	if(recvfrom(fd, &daemon_time, sizeof(int), 0, (struct sockaddr *)&address, &address_length) < 0)
 	{
-		log(0, " Error receiving message from multicast. Exiting...");
+		log(1, " Error receiving message from multicast. Exiting...");
 		exit(1);
 	}
 
 	/* Set the client time to the updated time. */
 	clock_count = daemon_time;
-	log(1, " Clock updated: " + itos(clock_count));
+	log(0, " Clock updated: " + itos(clock_count));
 
 	/* Send the response to the time daemon that the clock has been updated. */
 	response = 1;
 	if(sendto(fd, &response, sizeof(int), 0, (struct sockaddr *)&address, sizeof(address)) < 0)
 	{
-		log(0, " Error writing to socket. Exiting...");
-		exit(0);
+		log(1, " Error writing to socket. Exiting...");
+		exit(1);
 	}
 
 	close(fd);
@@ -203,8 +203,8 @@ int main(int argc, char **argv)
 	if(argc < 3)
 	{
 		/* Show error if the correct number of arguments were not passed. */
-		cerr << "Usage time daemon: part_one <group_address> <port_number> <groupsize>\n";
-		cerr << "Usage clients: part_one <group_address> <port_number>\n";
+		log(1, "Usage time daemon: part_one <group_address> <port_number> <groupsize>");
+		log(1, "Usage clients: part_one <group_address> <port_number>");
 		exit(1);
 	}
 
