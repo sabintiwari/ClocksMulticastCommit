@@ -118,7 +118,7 @@ void daemon(std::string host, int port, int groupsize)
 /* Method that performs the function of the client machines that need to be synchronised. */
 void client(std::string host, int port)
 {	
-	/* Create the datagram socket and exit if there is an error. */
+	/* Create the datagram socket. Exit if there is an error. */
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{

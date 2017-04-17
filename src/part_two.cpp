@@ -31,7 +31,8 @@ using namespace std;
 struct socket_data
 {
 	int fd;
-	struct sockaddr_in group_address, sender_address;
+	struct sockaddr_in address, sender_address;
+    struct ip_mreq mreq;
 };
 
 /* Global Variables. */
@@ -74,8 +75,12 @@ int main(int argc, char **argv)
 	srand(id);
 	clock_count = rand() % 100;
 
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(fd < 0)
+    /* Set up the socket data and address. */
+    struct socket_data *data;
+	data = (struct socket_data*) malloc(sizeof(struct socket_data));
+
+    data->fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(data->fd < 0)
     {
         log(1, " Error creating UDP socket. Exiting...");
         exit(1);
@@ -83,20 +88,38 @@ int main(int argc, char **argv)
 
     /* Allow mutiple sockets to use same port. */
 	uint status = 1;
-	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof(status)) < 0)
+	if(setsockopt(data->fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof(status)) < 0)
 	{
 		log(1, " Error reusing port for UDP socket. Exiting...");
 		exit(1);
 	}
 
-    /* Set up the socket data and address. */
-    struct socket_data *data;
-	data = (struct socket_data*) malloc(sizeof(struct socket_data));
+    /* Set up the address. */
+    memset(&(data->address), 0, sizeof(data->address));
+    data->address.sin_family = AF_INET;
+    data->address.sin_addr.s_addr = htonl(INADDR_ANY);
+    data->address.sin_port = htons(atoi(argv[2]));
+    
+    /* Bind the socket to the address. */
+    if(bind(data->fd, (struct sockaddr *)&(data->address), sizeof(data->address)) < 0)
+	{
+		log(1, " Error binding to the UDP socket. Exiting...");
+		exit(1);
+	}
+
+    /* Set the ip_mreq information to join the multicast group. */
+	data->mreq.imr_multiaddr.s_addr = inet_addr(argv[1]);
+	data->mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	if(setsockopt(data->fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &(data->mreq), sizeof(data->mreq)) < 0)
+	{
+		log(1, " Error joining the multicast group. Exiting...");
+		exit(1);
+	}
 
     /* Setup the thread variables. */
     pthread_t send, receive;
-    pthread_create(&send, NULL, sender, NULL);
-    pthread_create(&receive, NULL, receiver, NULL);
+    pthread_create(&send, NULL, sender, data);
+    pthread_create(&receive, NULL, receiver, data);
 
     if(argc == 4)
     {
