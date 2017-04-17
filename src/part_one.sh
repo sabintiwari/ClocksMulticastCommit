@@ -14,6 +14,7 @@ do
 done
 
 # Start the time daemon.
+sleep 0.1s
 ./part_one $HOST $PORT $GROUPSIZE
 
 # Wait for the programs to converge.

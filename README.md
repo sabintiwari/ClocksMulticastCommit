@@ -20,7 +20,7 @@ This will create executable files: `part_one`, `part_two`, and `part_three`
 ***
 #### Run
 ***
-There are three executables in the program that can be run using the bash scripts.
+There are three executables in the program that can be run using their respective bash scripts.
 
 Assignment 1 (parameters: multicast_group_address, port_number, group_size):
 ```bash

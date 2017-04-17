@@ -19,6 +19,9 @@
 
 /* Define global constants. */
 #define MAX_DATASIZE 1024
+#define GROUP_HOST "224.0.0.1"
+#define GROUP_PORT 3000
+#define GROUP_SIZE 5
 
 /* Import namespaces. */
 using namespace std;
@@ -131,7 +134,7 @@ void client(std::string host, int port)
 		exit(1);
 	}
 
-	/* Set up the addreses. */
+	/* Set up the address. */
 	struct sockaddr_in address;
 	memset(&address, 0, sizeof(address));
 	address.sin_family = AF_INET;
@@ -203,8 +206,8 @@ int main(int argc, char **argv)
 	if(argc < 3)
 	{
 		/* Show error if the correct number of arguments were not passed. */
-		log(1, "Usage time daemon: part_one <group_address> <port_number> <groupsize>");
-		log(1, "Usage clients: part_one <group_address> <port_number>");
+		cerr << "Usage time daemon: part_one <group_address> <port_number> <groupsize>\n";
+		cerr << "Usage clients: part_one <group_address> <port_number>\n";
 		exit(1);
 	}
 
@@ -213,15 +216,32 @@ int main(int argc, char **argv)
 	srand(id);
 	clock_count = rand() % 100;
 
+	/* Verify that the address and port are passed. */
+	std::string host = argv[1];
+	std::string port_str = argv[2];
+	int port;
+	if(host.empty())
+		host = GROUP_HOST; /* Set the host to default. */
+	if(port_str.empty())
+		port = GROUP_PORT; /* Set the port to default. */
+	else
+		port = atoi(port_str.c_str());
+
 	if(argc == 3)
 	{
-		/* Call the client method if 1 argument is passed. */
-		client(argv[1], atoi(argv[2]));
+		/* Call the client method if 2 arguments are passed. */
+		client(host, port);
 	}
 	else 
 	{
-		/* Call the daemon method if 2 arguments are passed. */
-		daemon(argv[1], atoi(argv[2]), atoi(argv[3]));
+		/* Call the daemon method if 3 arguments are passed. */
+		std::string groupsize_str = argv[3];
+		int groupsize;
+		if(groupsize_str.empty())
+			groupsize = GROUP_SIZE; /* Set the group size to default. */
+		else
+			groupsize = atoi(groupsize_str.c_str());
+		daemon(host, port, groupsize);
 	}
 
 	return 0;
