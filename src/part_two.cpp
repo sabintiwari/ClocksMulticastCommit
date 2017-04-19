@@ -17,15 +17,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 /* Define global constants. */
-#define MAX_DATASIZE 1024
+#define MAX_DATASIZE 4096
 #define GROUP_HOST "224.0.0.1"
 #define GROUP_PORT 3000
 #define GROUP_SIZE 5
-#define MESSAGES 5
+#define MESSAGES 25
 
 /* Import namespaces. */
 using namespace std;
@@ -38,7 +39,7 @@ struct conn_data
 };
 
 /* Global Variables. */
-int id, clock_count;
+int id, clock_count, last_recv;
 bool ordered;
 std::ofstream log_file;
 
@@ -58,17 +59,52 @@ void log(int type, std::string message)
     // std::string dt_str(dt);
     // dt_str = dt_str.substr(0, dt_str.size() - 1);
 
-    // struct timeval current;
-    // gettimeofday(&current, 0);
-    // int milli = current.tv_usec;
+    time_t rawtime;
+    struct tm * timeinfo;
+    char timebuffer[80];
+    time (&rawtime);
+    timeinfo = localtime (&rawtime);
+    strftime (timebuffer, 80, "%I:%M:%S", timeinfo);
 
-    std::string dt_str = "";
+    struct timeval current;
+    gettimeofday(&current, 0);
+    int milli = current.tv_usec;
+
+    std::string dt_str(timebuffer);
+    dt_str = dt_str + ":" + itos(milli / 10);
+
+    //std::string dt_str = "";
     if(log_file.is_open())
         log_file << "[" << dt_str << "][Process " << id << "]" << message << endl;
 	if(type == 1) 
         cerr << "[" << dt_str << "][Process " << id << "]" << message << "\n";
 	else 
         cout << "[" << dt_str << "][Process " << id << "]" << message << "\n";		
+}
+
+/* Function that handles the timeout for the recv calls for 4 seconds. */
+void *timer(void *args)
+{
+    /* Get the connection data. */
+    struct conn_data *data;
+    data = (struct conn_data *) args;
+
+    int end = 0;
+    while(end == 0)
+    {
+        sleep(1);
+        last_recv++;
+        if(last_recv >= 4)
+        {
+            end = 1;
+        }
+    }
+
+    /* Exit the program when the timeout is reached. */
+    log(0, " Exiting...");
+    log_file.close();
+    close(data->fd);
+    exit(0);
 }
 
 /* Thread function that handles the sending of the multicast message. */
@@ -90,11 +126,11 @@ void *sender(void *args)
     int status;
 
     /* Send a message for the count of MESSAGES. */
-    sleep(1);
+    //sleep(2);
     for(int i = 0; i < MESSAGES; i++)
     {
-        buffer_str = itos(id) + ":" + itos(clock_count);
         clock_count++;
+        buffer_str = itos(id) + ":" + itos(clock_count);
         status = sendto(data->fd, buffer_str.c_str(), buffer_str.size(), 0, (struct sockaddr *)&group_address, sizeof(group_address));
         if(status < 0)
         {
@@ -148,31 +184,33 @@ void *receiver(void *args)
         exit(1);
     }
 
-    /* Set the receive option to timeout if no messages are received within 5 seconds. */
-    struct timeval timeout;
-    timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
-    status = setsockopt(data->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    if(status < 0) {
-        perror("Error");
-    }
+    /* Set the receive option to timeout if no messages are received within 3 seconds. */
+    // struct timeval timeout;
+    // timeout.tv_sec = 0;
+    // timeout.tv_usec = 100000;
+    // status = setsockopt(data->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    // if(status < 0) {
+    //     perror("Error");
+    // }
 
     /* Variables for the thread. */
     socklen_t addr_length = sizeof(address);
     char buffer[MAX_DATASIZE];
     std::string buffer_str;
     
-    for(int i = 0; i < MESSAGES*(data->groupsize); i++)
+    while(1)
     {
         /* Wait to receive message from other processes. */
+        memset(&buffer[0], 0, MAX_DATASIZE);
         status = recvfrom(data->fd, &buffer, MAX_DATASIZE, 0, (struct sockaddr *)&address, &addr_length);
         if(status < 0)
         {
             log(1, " Exiting...");
-            return NULL;
+            exit(1);
         }
 
-        /* Filter the messages from itself */
+        /* Filter the messages from itself. */
+        last_recv = 0;
         buffer[status] = '\0';
         buffer_str = buffer;
         if(buffer_str.find(itos(id) + ":") == std::string::npos)
@@ -181,7 +219,7 @@ void *receiver(void *args)
             clock_count++;
             if(!ordered)
             {
-                log(0, " Received [" + itos(i) + "]" + buffer_str);
+                log(0, " Received - " + buffer_str);
             }
         }
     }
@@ -207,6 +245,7 @@ int main(int argc, char **argv)
     /* Set the clock to a random value with PID as seed. */
 	id = getpid();
 	clock_count = 0;
+    last_recv = 0;
 
     /* Setup the log file. */
     std::string filename = "logs/process_" + itos(id) + "log.txt";
@@ -228,13 +267,15 @@ int main(int argc, char **argv)
     }
 
     /* Setup the thread variables. */
-    pthread_t send, receive;
+    pthread_t send, receive, timeout;
     pthread_create(&send, NULL, sender, data);
     pthread_create(&receive, NULL, receiver, data);  
+    pthread_create(&timeout, NULL, timer, data);
 
     /* Joing the two thread. */
     pthread_join(send, NULL);
     pthread_join(receive, NULL);  
+    pthread_join(timeout, NULL);  
 
     close(data->fd);
     log_file.close();

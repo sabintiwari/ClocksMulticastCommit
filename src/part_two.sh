@@ -10,8 +10,8 @@ GROUPSIZE=$3
 # Start client processes.
 for ((a = 1; a <= $GROUPSIZE; a++))
 do
-	sleep 0.1s
-	./part_two $HOST $PORT $GROUPSIZE&
+	#sleep 0.1s
+	./part_two $HOST $PORT $GROUPSIZE &
 done
 
 # Wait for the programs to converge.
