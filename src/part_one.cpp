@@ -50,6 +50,7 @@ void log(int type, std::string message)
 void daemon(std::string host, int port, int groupsize)
 {
 	/* Create the datagram socket and exit if there is an error. */
+	sleep(1);
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0)
 	{

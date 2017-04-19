@@ -2,9 +2,17 @@
 #	CMSC 621
 #	Project 2
 
-compile:
+compile: part_one part_two directories
+
+part_one:
 	g++ -o part_one part_one.cpp
-	g++ -o part_two part_two.cpp -lpthread
+
+part_two:
+	g++ -o part_two part_two.cpp -lpthread -lm
+
 clean:
-	rm -f part_one
-	rm -f part_two
+	rm -f part_one part_two
+	rm -rf logs
+
+directories:
+	mkdir -p logs
