@@ -23,6 +23,8 @@
         "type_traits": "cpp",
         "typeinfo": "cpp",
         "ctime": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "utility": "cpp",
+        "cmath": "cpp"
     }
 }

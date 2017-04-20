@@ -8,7 +8,7 @@ part_one:
 	g++ -o part_one part_one.cpp
 
 part_two:
-	g++ -o part_two part_two.cpp -lpthread -lm
+	g++ -std=c++11 -o part_two part_two.cpp -lpthread -lm
 
 clean:
 	rm -f part_one part_two

@@ -6,12 +6,25 @@
 HOST=$1
 PORT=$2
 GROUPSIZE=$3
+ORDERED=$4
+
+# Start the sequencer
+if [ $ORDERED == 'Y' ]
+then
+	./part_two $HOST $PORT $GROUPSIZE "Y" "Y" &
+else
+	./part_two $HOST $PORT $GROUPSIZE &
+fi
 
 # Start client processes.
-for ((a = 1; a <= $GROUPSIZE; a++))
+for ((a = 1; a < $GROUPSIZE; a++))
 do
-	#sleep 0.1s
-	./part_two $HOST $PORT $GROUPSIZE &
+	if [ $ORDERED == 'Y' ]
+	then
+		./part_two $HOST $PORT $GROUPSIZE "Y" &
+	else
+		./part_two $HOST $PORT $GROUPSIZE &
+	fi
 done
 
 # Wait for the programs to converge.
