@@ -8,8 +8,9 @@
 /* Include header files. */
 #include <arpa/inet.h>
 #include <ctime>
-#include <iostream>
 #include <fstream>
+#include <iterator>
+#include <iostream>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sstream>
@@ -20,22 +21,28 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 /* Define global constants. */
 #define MAX_DATASIZE 4096
 #define GROUP_HOST "224.0.0.1"
 #define GROUP_PORT 3000
 #define GROUP_SIZE 5
-#define MESSAGES 25
+#define MESSAGES 50
 
 /* Import namespaces. */
 using namespace std;
 
-/* Structure for the program. */
+/* Structures for the program. */
 struct conn_data
 {
 	int fd, port, groupsize, messages;
     std::string host;
+};
+struct message
+{
+    int process, sendclock, selfclock;
+    std::string str;
 };
 
 /* Global Variables. */
@@ -49,6 +56,24 @@ std::string itos(int value)
     std::stringstream str;
     str << value;
     return str.str();
+}
+
+/* Splits a string using a delimeter. */
+template<typename Out>
+void split(const std::string &s, char delim, Out result) {
+    std::stringstream ss;
+    ss.str(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        *(result++) = item;
+    }
+}
+
+/* Uses split() to get the vector of string elements. */
+std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    split(s, delim, std::back_inserter(elems));
+    return elems;
 }
 
 /* Logs a message to cout or cerr. */
@@ -94,7 +119,7 @@ void *timer(void *args)
     {
         sleep(1);
         last_recv++;
-        if(last_recv >= 4)
+        if(last_recv >= 5)
         {
             end = 1;
         }
@@ -126,11 +151,11 @@ void *sender(void *args)
     int status;
 
     /* Send a message for the count of MESSAGES. */
-    //sleep(2);
+    sleep(3);
     for(int i = 0; i < MESSAGES; i++)
     {
         clock_count++;
-        buffer_str = itos(id) + ":" + itos(clock_count);
+        buffer_str = itos(id) + ":" + itos(clock_count) + ":" + "MESSAGE_" + itos(i + 1);
         status = sendto(data->fd, buffer_str.c_str(), buffer_str.size(), 0, (struct sockaddr *)&group_address, sizeof(group_address));
         if(status < 0)
         {
@@ -184,19 +209,11 @@ void *receiver(void *args)
         exit(1);
     }
 
-    /* Set the receive option to timeout if no messages are received within 3 seconds. */
-    // struct timeval timeout;
-    // timeout.tv_sec = 0;
-    // timeout.tv_usec = 100000;
-    // status = setsockopt(data->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    // if(status < 0) {
-    //     perror("Error");
-    // }
-
     /* Variables for the thread. */
     socklen_t addr_length = sizeof(address);
     char buffer[MAX_DATASIZE];
     std::string buffer_str;
+    std::vector<struct message> messages;
     
     while(1)
     {
@@ -215,11 +232,22 @@ void *receiver(void *args)
         buffer_str = buffer;
         if(buffer_str.find(itos(id) + ":") == std::string::npos)
         {  
-            /* Print the message received from the multicast. */
             clock_count++;
             if(!ordered)
             {
+                /* Print the message received from the multicast. */
                 log(0, " Received - " + buffer_str);
+            }
+            else
+            {
+                /* Store the message to send later. */
+                message msg;
+	            std::vector<std::string> tokens = split(buffer_str, ':');
+                msg.process = atoi(tokens.at(0).c_str());
+                msg.sendclock = atoi(tokens.at(1).c_str());
+                msg.selfclock = clock_count;
+                msg.str = tokens.at(2);
+                messages.push_back(msg);
             }
         }
     }

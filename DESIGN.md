@@ -16,5 +16,13 @@ One of the issues I encountered was making sure the messages were delivered corr
 Another issue I had was deciding how to handle which process would become the time daemon. Since leader election was not part of the requirements, I decided that the leader will be elected on process execution. This makes it important to run the other processes beforehand and then running the time daemon to poll to start the clock synchronization process. The bash script `part_one.sh` makes sure the processes are started in a way that the time daemon will properly poll and start the synchronization.
 
 ### Assignment 2
+The implementation of part two of the project also uses UDP sockets to setup a multicast group. The program can be launched by passing in the multicast group address, the port number, the total number of processes in the group, and (optionally) a flag to make the program use total ordering. If the last parameter, i.e. the total ordering flag is passed then the processes will wait to print the message after ordering else they will print as soon as they receive it. All the processes will start a send and receive thread. The send thread will wait for 3 seconds, then send 50 messages to the multicast group. The receive thread will have a loop that keeps waiting to receive until no messages have been received for 5 seconds. Once 5 seconds have passed, the program will close the socket, the log file, and it will exit.
+
+The ordered version of the program uses a `std::vector` to store the incoming messages.
+
+This program also outputs to a log file. When running the part_two.sh script, the number of processes that are run will each have a log file created in the logs directory so that it's easier to distinguish the message logs. The logs will have a time stamp, both logical from the sender message as well as the actual time that the receiver process printed the message.
+
+The main issue I encountered was somehow getting unordered outputs when not using the total ordering. Even though there were not ordering algorithms in place, the messages we always being delivered in order when running all the processes on one machine.
+
 
 ### Assignment 3
