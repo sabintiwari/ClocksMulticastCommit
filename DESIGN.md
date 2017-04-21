@@ -62,7 +62,6 @@ The main issue I encountered was somehow getting unordered outputs when not usin
 [01:23:43:424367][11910][Process] Sending - 0.0.0.0:11910:8:MESSAGE_2
 [01:23:43:424513][11910][Process] Sending - 0.0.0.0:11910:9:MESSAGE_3
 [01:23:48:424629][11910][Process] Exiting...
-
 ```
 
 `Ordered`:
