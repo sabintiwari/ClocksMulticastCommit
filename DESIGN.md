@@ -6,7 +6,7 @@
 
 I chose to implement each of the assignment in different programs.
 
-#### Assignment 1
+#### Assignment 1 `part_one.cpp`
 
 The implementation of part one of the project uses UDP sockets to setup a multicast group. The program can be launched by passing in the multicast group address, the port number, and, (optionally) the total number of processes in the group including the time daemon. If the last parameter, i.e. the group count is passed then the process will make itself the time daemon and will send its clock count to poll all the other clients to send their time offset. In the regular process, the request will be waiting to receive a poll message from the time daemon. When the message is received, the process will check the difference between its clock count and the time daemon's clock count then send a reply with the value. The time daemon, after receiving responses from the other processes, will calculate the average difference of the group, add to its own time and send the updated time as a multicast to all the other processes in the group. The other processes will update their own time after receiving the new clock count then send a reply to the time daemon so the the sockets can be closed.
 
@@ -35,7 +35,7 @@ Running `part_one.sh` like this `./part_one.sh 224.0.0.1 3003 5`, gave the follo
 [Process 30932] Clock updated: 27
 ```
 
-#### Assignment 2
+#### Assignment 2 `part_two.cpp`
 
 The implementation of part two of the project also uses UDP sockets to setup a multicast group. The program can be launched by passing in the multicast group address, the port number, the total number of processes in the group, and (optionally) a flag to make the program use total ordering. If the last parameter, i.e. the total ordering flag is passed then the processes will wait to print the message after ordering else they will print as soon as they receive it. All the processes will start a send and receive thread. The send thread will wait for 3 seconds, then send 50 messages to the multicast group. The receive thread will have a loop that keeps waiting to receive until no messages have been received for 5 seconds. Once 5 seconds have passed, the program will close the socket, the log file, and it will exit.
 
@@ -95,5 +95,35 @@ The main issue I encountered was somehow getting unordered outputs when not usin
 [01:20:13:689316][11518][Sequencer] Exiting...
 ```
 
-#### Assignment 3
-The design of the third assignment is also in a different program. The program
+#### Assignment 3 `part_three.cpp`
+The design of the third assignment is also in a different program. The program uses `pthread` library to handle access to the file. First of all, when the survey started, it waits for a connection coming from the client then starts a thread to handle the file lock for the specific client. The thread uses `pthread_mutex` and `pthread_cond` to lock a variable that will be used to give access to the thread to send the client that it's handling an `OK` to read and write to the file. Then the client that receives the `OK` will read the file, update the value, write to the file, and send a message to the server to signal that it has finished. Then the server will give access to the next thread that is waiting.
+* The following is the output from all the clients and the server when running like so: `./part_three.sh localhost 3005 5`.
+
+```bash
+[02:29:31:165478][25510][Server] Started. Listening...
+[02:29:31:267757][25510][Server] Received request from a client: 127.0.0.1
+[02:29:31:268157][25513][Client] Waiting for server to send access.
+[02:29:31:369905][25516][Client] Waiting for server to send access.
+[02:29:31:369954][25510][Server] Received request from a client: 127.0.0.1
+[02:29:31:470866][25519][Client] Waiting for server to send access.
+[02:29:31:470866][25510][Server] Received request from a client: 127.0.0.1
+[02:29:31:572210][25522][Client] Waiting for server to send access.
+[02:29:31:572315][25510][Server] Received request from a client: 127.0.0.1
+[02:29:31:572386][25516][Client] Got access. Performing read/write...
+[02:29:31:572436][25516][Client] Reading initial value: 0
+[02:29:31:572570][25516][Client] Updating the value: 1
+[02:29:31:572648][25516][Client] Reading the updated value: 1
+[02:29:31:572738][25513][Client] Got access. Performing read/write...
+[02:29:31:572787][25513][Client] Reading initial value: 1
+[02:29:31:572855][25513][Client] Updating the value: 2
+[02:29:31:572900][25513][Client] Reading the updated value: 2
+[02:29:31:573061][25519][Client] Got access. Performing read/write...
+[02:29:31:573101][25519][Client] Reading initial value: 2
+[02:29:31:573157][25519][Client] Updating the value: 3
+[02:29:31:573240][25519][Client] Reading the updated value: 3
+[02:29:31:573443][25522][Client] Got access. Performing read/write...
+[02:29:31:573489][25522][Client] Reading initial value: 3
+[02:29:31:573553][25522][Client] Updating the value: 4
+[02:29:31:573598][25522][Client] Reading the updated value: 4
+[02:29:36:165985][25510][Server] Exiting...
+```

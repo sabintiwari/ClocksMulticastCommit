@@ -8,6 +8,7 @@
 /* Include header files. */
 #include <arpa/inet.h>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -26,7 +27,7 @@
 /* Define the global constants. */
 #define MAXDATASIZE 1024
 #define MAXUPDATES 5
-#define FILENAME "part_three.txt"
+#define FILENAME "./part_three.txt"
 
 /* Import namespaces. */
 using namespace std;
@@ -45,8 +46,7 @@ struct message_data
 
 /* Global Variables */
 std::vector<struct message_data> messages_vector;
-std::fstream count_file;
-int id, logical_clock, used_threads = 0, recv_count = 0;
+int id, logical_clock, used_threads = 0, recv_count = 0, last_recv = 0;
 bool isseq, islocked;
 pthread_mutex_t file_lock;
 pthread_cond_t file_cond;
@@ -77,68 +77,85 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-/* Check if this process is granted access. */
-bool get_access(int id)
+/* Logs a message to cout or cerr. */
+void log(std::string message)
 {
-    int min = -1;
-    int minid = -1;
-    message_data msg;
-    for(int i = 0; i < messages_vector.size(); i++)
-    {
-        msg = messages_vector.at(i);
-        cout << msg.process << ":" << msg.lclock << "\n";
-        if(min == -1 || msg.lclock < min)
-        {
-            min = msg.lclock;
-            minid = msg.process;
-        }
-    }
+    /* Get the Hour, Minute, and Seconds timestamp. */
+    time_t rawtime;
+    struct tm * timeinfo;
+    char timebuffer[80];
+    time (&rawtime);
+    timeinfo = localtime (&rawtime);
+    strftime (timebuffer, 80, "%I:%M:%S", timeinfo);
 
-    return id == minid;
+    /* Get the nanosecond timestamp */
+    struct timeval current;
+    gettimeofday(&current, 0);
+    int nano = current.tv_usec;
+
+    /* Create the log message */
+    std::string dt_str(timebuffer);
+    dt_str = dt_str + ":" + itos(nano);
+    std::string stamp = "[" + dt_str + "][" + itos(id) + "]";
+    if(isseq)
+    {
+        stamp = stamp.append("[Server]");
+    }
+    else
+    {
+        stamp = stamp.append("[Client]");
+    }
+        
+    /* Log to cout if its a regular message. */
+    cout << stamp << " " << message << "\n";     
 }
 
-/* Removes the item from the message list with the id specified. */
-bool remove_by_id(int id)
-{   
-    int index = -1;
-    message_data msg;
-    for(int i = 0; i < messages_vector.size(); i++)
+/* Function that handles the timeout for the accept calls for 5 seconds. */
+void *timer(void *args)
+{
+    if(isseq)
     {
-        msg = messages_vector.at(i);
-        if(id ==  msg.process)
+        /* Get the connection data. */
+        int data = *((int *) args);
+
+        int end = 0;
+        while(end == 0)
         {
-            index = i;
-            break;
+            sleep(1);
+            last_recv++;
+            if((last_recv >= 5))
+            {
+                end = 1;
+            }
         }
+
+        /* Exit the program when the timeout is reached. */
+        log("Exiting...");
+        close(data);
+        exit(0);
     }
-    if(index > -1)
-    {
-        messages_vector.erase(messages_vector.begin() + index);
-        return true;
-    }
-    return false;
+    
 }
 
 /* Thread that handles each clients request. */
 void *seq_thread(void *args)
 {
     /* Get the socket data. */
-	struct socket_data *data;
-	data = (struct socket_data *) args;
+	socket_data data = *((socket_data*)args);
 
     /* Values to store the responses. */
     char buffer[MAXDATASIZE];
     std::string buffer_str, client_str;
 
     /* Create the string form of the client address. */
-	client_str = inet_ntoa(data->address.sin_addr);
+	client_str = inet_ntoa(data.address.sin_addr);
 
     /* Read in the request from the client. */
     memset(&buffer[0], 0, MAXDATASIZE);
-    int status = read(data->socket_fd, &buffer, MAXDATASIZE);
+    int status = read(data.socket_fd, &buffer, MAXDATASIZE);
     if(status < 0)
     {
-        cerr << "Error receiving data from client.\n";
+        log("Error receiving data from client.");
     }
 
     /* Get the data from the client and store the data. */
@@ -147,65 +164,40 @@ void *seq_thread(void *args)
     buffer_str = buffer;
 
     /* Wait for all the processes to send the request. */
-    while(recv_count < data->groupsize - 1) { }
+    while(recv_count < data.groupsize - 1) { }
 
-    /* Create the message data. */
-    std::vector<std::string> tokens = split(buffer_str, ':');
-    message_data msg;
-    msg.process = atoi(tokens.at(0).c_str());
-    msg.lclock = atoi(tokens.at(1).c_str());
-    msg.str = tokens.at(2);
-    messages_vector.push_back(msg);
+    /* Create the mutex lock point. */
+    pthread_mutex_lock(&file_lock);
 
-    bool end = false;
-    int client_id = msg.process;
-    int lclock = msg.lclock;
-    // while(!end)
-    // {
-    //     /* Check if the file is locked. */
-    //     if(!islocked)
-    //     {
-    //         /* Check if the clock is the lowest for this process. */
-    //         if(get_access(client_id))
-    //         {
-                /* Create the mutex lock point. */
-		        pthread_mutex_lock(&file_lock);
+    if(islocked)
+    {
+        pthread_cond_wait(&file_cond, &file_lock);
+    }
 
-                if(islocked)
-                {
-                    pthread_cond_wait(&file_cond, &file_lock);
-                }
+    islocked = true;
+    
+    /* Send the write access to the client. */
+    status = write(data.socket_fd, &id, sizeof(id));
+    if(status < 0)
+    {
+        log("Error writing data to client.");
+    }
+    
+    /* Wait for the release of the lock from the client. */
+    status = read(data.socket_fd, &status, sizeof(int));
+    if(status < 0)
+    {
+        log("Error receiving data from client.");
+    }
 
-                islocked = true;
-                cout << "Client [" << client_id << ":" << lclock << "] got access.\n";
-                
-                /* Send the write access to the client. */
-                status = write(data->socket_fd, &id, sizeof(id));
-                if(status < 0)
-                {
-                    cerr << "Error writing data to client.\n";
-                }
-                
-                /* Wait for the release of the lock from the client. */
-                status = read(data->socket_fd, &lclock, sizeof(int));
-                if(status < 0)
-                {
-                    cerr << "Error receiving data from client.\n";
-                }
-
-                /* Unlock the record after writing */
-                islocked = false;
-                remove_by_id(id);
-                pthread_cond_signal(&file_cond);
-                pthread_mutex_unlock(&file_lock);
-                end = true;
-    //         }
-    //     }
-    // }
+    /* Unlock the record after writing */
+    islocked = false;
+    //remove_by_id(id);
+    pthread_cond_signal(&file_cond);
+    pthread_mutex_unlock(&file_lock);
 
     /* Close the socket once the request is complete. */
-    close(data->socket_fd);
-    free(data);
+    close(data.socket_fd);
     used_threads--;
 }
 
@@ -216,7 +208,7 @@ void sequencer(std::string host, int port, int groupsize)
 	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(listen_fd < 0)
 	{
-		cerr < "Error creating socket.\n";
+		log("Error creating socket.");
 		exit(0);
 	}
 
@@ -230,40 +222,49 @@ void sequencer(std::string host, int port, int groupsize)
     int status = bind(listen_fd, (struct sockaddr *)&address, sizeof(address));
     if(status < 0)
     {
-        cerr < "Error binding socket. \n";
+        log("Error binding socket.");
+        exit(0);
     }
 
     /* Wait and listen for a request from a client. */
-    cout << "Sequencer started. Listening...\n";
+    log("Started. Listening...");
 	listen(listen_fd, groupsize - 1);
 
     /* Setup the variables required for the function. */
+    pthread_t timeout;
+    int *arg = (int *)malloc(sizeof(arg));
+    pthread_create(&timeout, 0, timer, arg);
     pthread_t threads[groupsize];
     pthread_cond_init(&file_cond, NULL);
 	pthread_mutex_init(&file_lock, NULL);
+    std::string client_addr_str;
 
     /* Main loop for the server program. */
     while(1)
     {
         /* Create the socket data. */
-        struct socket_data *client;
-		client = (struct socket_data*) malloc(sizeof(struct socket_data));
+        socket_data client;
 
         /* Accept a client request. */
-		socklen_t client_length = sizeof(client->address);
-        client->groupsize = groupsize;
-		client->socket_fd = accept(listen_fd, (struct sockaddr *)&(client->address), &client_length);
-		if(client->socket_fd < 0)
+		socklen_t client_length = sizeof(client.address);
+        client.groupsize = groupsize;
+		client.socket_fd = accept(listen_fd, (struct sockaddr *)&(client.address), &client_length);
+		if(client.socket_fd < 0)
 		{
-			cerr << "Error accepting client request.\n";
+            log("Error accepting client request.");
 			return;
 		}
 
         /* Create a thread call the client request function. */
-		pthread_create(&threads[used_threads], NULL, seq_thread, (void*) client);
+		pthread_create(&threads[used_threads], NULL, seq_thread, (void*) &client);
 		used_threads++;
+
+        /* Write a message. */
+        client_addr_str = inet_ntoa(client.address.sin_addr);
+        log("Received request from a client: " + client_addr_str);
     }
 
+    pthread_join(timeout, NULL);
     close(listen_fd);
 }
 
@@ -276,7 +277,7 @@ void client(std::string host, int port)
 	if(server == NULL)
 	{
 		/* Show error if the server does not exist. */
-		cerr << "No host exists with the address: " << host << "\n";
+		log("No host exists with the address: " + host);
 		exit(0);
 	}
 
@@ -291,7 +292,7 @@ void client(std::string host, int port)
 	if(socket_fd < 0)
 	{
 		/* Show error if the socket descriptor fails. */
-		cerr << "Socket is not formed.\n";;
+		log("Socket is not formed.");
 		exit(1);
 	}
 
@@ -300,7 +301,7 @@ void client(std::string host, int port)
 	if(status < 0)
 	{
 		/* Show error and exit if the connection fails. */
-		cerr << "Failed to connect to the server.\n";
+		log("Failed to connect to the server.");
 		exit(1);
 	}
 
@@ -313,54 +314,69 @@ void client(std::string host, int port)
     status = write(socket_fd, buffer_str.c_str(), buffer_str.size());
     if(status < 0)
     {
-        cerr << "Failed to send message to server.\n";
+        log("Failed to send message to server.");
         exit(1);
     }
+
+    /* Client waiting. */
+    log("Waiting for server to send access.");
 
     /* Wait for the server to send an ok message to read and write to the file. */
     status = read(socket_fd, &code, sizeof(int));
     if(status < 0)
     {
-        cerr << "Failed to read message from server.\n";
+        log("Failed to read message from server.");
         exit(1);
     }
 
-    cout << "Client [" << id << ":" << logical_clock << "] got access [" << code << "]. Performing read write...\n";
+    log("Got access. Performing read/write...");
 
-    /* Perform the file write. */
-    count_file.open(FILENAME, ios::out | ios::app);
+    /* Perform the file read initially. */
+    std::ifstream infile(FILENAME, ios::in);
     std::string str_in;
     int num_in;
-    if(count_file.is_open())
+
+    if(infile.is_open())
     {
-        if(std::getline(count_file, str_in))
+        if(!infile.eof())
         {
+            infile >> str_in;
             num_in = atoi(str_in.c_str());
-            cout << "Client [" << id << ":" << logical_clock << "] read initial value: " << num_in << "\n";
-            num_in++;
-            count_file << num_in << "\n";
-            cout << "Client [" << id << ":" << logical_clock << "] updated the value: " << num_in << "\n";
+            log("Reading initial value: " + itos(num_in));
         }
     }
-    count_file.close();
+    infile.close();
+
+    /* Perform the file write. */
+    num_in++;
+    std::ofstream outfile(FILENAME, ios::out);
+    if(outfile.is_open())
+    {
+        log("Updating the value: " + itos(num_in));
+        outfile << num_in << endl;
+    }
+    outfile.close();
+
 
     /* Verify that the update was made. */
-    if(count_file.is_open())
+    infile.open(FILENAME, ios::out | ios::app);
+    if(infile.is_open())
     {
-        if(std::getline(count_file, str_in))
+        if(!infile.eof())
         {
+            infile >> str_in;
             num_in = atoi(str_in.c_str());
-            cout << "Client [" << id << ":" << logical_clock << "] read the updated value: " << num_in << "\n";
+            log("Reading the updated value: " + itos(num_in));
         }
     }
-    count_file.close();
+    infile.close();
 
     /* Send the message to the server so that the lock can be released. */
     code++;
     status = write(socket_fd, &code, sizeof(int));
     if(status < 0)
     {
-        cerr << "Failed to send message to server.\n";
+        log("Failed to send message to server.");
         exit(1);
     }
 
