@@ -48,6 +48,8 @@ std::vector<struct message_data> messages_vector;
 std::fstream count_file;
 int id, logical_clock, used_threads = 0, recv_count = 0;
 bool isseq, islocked;
+pthread_mutex_t file_lock;
+pthread_cond_t file_cond;
 
 /* Get the string value from an int. */
 std::string itos(int value)
@@ -158,37 +160,48 @@ void *seq_thread(void *args)
     bool end = false;
     int client_id = msg.process;
     int lclock = msg.lclock;
-    while(!end)
-    {
-        /* Check if the file is locked. */
-        if(!islocked)
-        {
-            /* Check if the clock is the lowest for this process. */
-            if(get_access(client_id))
-            {
+    // while(!end)
+    // {
+    //     /* Check if the file is locked. */
+    //     if(!islocked)
+    //     {
+    //         /* Check if the clock is the lowest for this process. */
+    //         if(get_access(client_id))
+    //         {
+                /* Create the mutex lock point. */
+		        pthread_mutex_lock(&file_lock);
+
+                if(islocked)
+                {
+                    pthread_cond_wait(&file_cond, &file_lock);
+                }
+
                 islocked = true;
                 cout << "Client [" << client_id << ":" << lclock << "] got access.\n";
+                
                 /* Send the write access to the client. */
                 status = write(data->socket_fd, &id, sizeof(id));
-				if(status < 0)
-				{
-					cerr << "Error writing data to client.\n";
-				}
+                if(status < 0)
+                {
+                    cerr << "Error writing data to client.\n";
+                }
                 
                 /* Wait for the release of the lock from the client. */
-                int status = read(data->socket_fd, &lclock, sizeof(int));
+                status = read(data->socket_fd, &lclock, sizeof(int));
                 if(status < 0)
                 {
                     cerr << "Error receiving data from client.\n";
                 }
 
-                /* Release lock and end. */
+                /* Unlock the record after writing */
                 islocked = false;
                 remove_by_id(id);
+                pthread_cond_signal(&file_cond);
+                pthread_mutex_unlock(&file_lock);
                 end = true;
-            }
-        }
-    }
+    //         }
+    //     }
+    // }
 
     /* Close the socket once the request is complete. */
     close(data->socket_fd);
@@ -226,6 +239,8 @@ void sequencer(std::string host, int port, int groupsize)
 
     /* Setup the variables required for the function. */
     pthread_t threads[groupsize];
+    pthread_cond_init(&file_cond, NULL);
+	pthread_mutex_init(&file_lock, NULL);
 
     /* Main loop for the server program. */
     while(1)
@@ -310,7 +325,7 @@ void client(std::string host, int port)
         exit(1);
     }
 
-    cout << "Client [" << id << ":" << logical_clock << "] got access. Performing read write...\n";
+    cout << "Client [" << id << ":" << logical_clock << "] got access [" << code << "]. Performing read write...\n";
 
     /* Perform the file write. */
     count_file.open(FILENAME, ios::out | ios::app);
