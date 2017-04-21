@@ -25,6 +25,10 @@
         "ctime": "cpp",
         "fstream": "cpp",
         "utility": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "array": "cpp",
+        "cstring": "cpp",
+        "iomanip": "cpp",
+        "tuple": "cpp"
     }
 }

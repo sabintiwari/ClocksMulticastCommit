@@ -43,15 +43,20 @@ struct conn_data
 struct message
 {
     int process, sendclock, selfclock;
-    bool delivered, isseqmsg;
-    std::string str;
+    bool isseqmsg, isselfsent;
+    std::string addr, str;
+};
+struct buffer_data
+{
+    char bfr[MAX_DATASIZE];
 };
 
 /* Global Variables. */
-int id, clock_count, last_recv, recv_count;
+int id, clock_count, last_recv, recv_count, used_threads = 0;
 bool ordered, sequencer;
 std::vector<struct message> message_vector;
 std::ofstream log_file;
+std::string addr_str;
 
 /* Get the string value from an int. */
 std::string itos(int value)
@@ -113,8 +118,8 @@ void log(int type, std::string message)
         /* Write to the log file */
         log_file << stamp << " " << message << endl;
     }
-        
-	if(type == 1)
+    
+    if(type == 1)
     {
         /* Log to cerr if its an error. */
         cerr << stamp << " " << message << "\n";
@@ -126,82 +131,61 @@ void log(int type, std::string message)
     }		
 }
 
-/* Checks if the message can be printed. */
-bool is_printable(message a)
+/* Checks if the messages can be printed. */
+void print_messages()
 {
-    if(a.process == id) return false;
+    last_recv = 0;
+    if(message_vector.empty()) return;
 
-    std::string msg;
-    bool print = false;
-    int index = -1;
-    message b;
     /* Iterate through the messages and check if there exists a sequencer or a process message.*/
-    for(int i = 0; i < message_vector.size(); i++)
+    message a, b;
+    std::string msg;
+    std::vector<int> indeces;
+
+    try 
     {
-        b = message_vector.at(i);
-        if(!a.isseqmsg && b.isseqmsg)
-        {
-            /* If the message to check is a client message, then check for a corresponding sequencer message. */
-            if(b.sendclock == recv_count + 1) {
-                msg = itos(a.process) + ":" + itos(a.sendclock) + ":" + a.str;
-                if(msg == b.str)
+        for(unsigned i = 0; i < message_vector.size(); ++i) {
+            a = message_vector.at(i);
+            
+            /* If the message is a sequence message or the message has already been delivered. */
+            if(a.isseqmsg) continue;
+
+            /* Iterate through all the messages again. */
+            for(unsigned j = 0; j < message_vector.size(); ++j)
+            {
+                b = message_vector.at(j);
+                if(b.isseqmsg)
                 {
-                    /* If the message matches for the seq and client message.*/
-                    print = true;
-                    index = i;
-                    recv_count++;
-                }
-            }
-        }
-        else if(a.isseqmsg && !b.isseqmsg)
-        {
-            /* If the message to check is a sequence message, then check for a corresponding sequencer message. */
-            if(a.sendclock == recv_count + 1) {
-                msg = itos(b.process) + ":" + itos(b.sendclock) + ":" + b.str;
-                if(msg == a.str)
-                {
-                    /* If the message matches for the seq and client message.*/
-                    print = true;
-                    index = i;
-                    recv_count++;
+                    /* If the sendclock and recv_count are in sync, deliver the message. */
+                    msg = a.addr + ":" + itos(a.process) + ":" + itos(a.sendclock) + ":" + a.str;
+                    if(b.sendclock == recv_count + 1 && msg == b.str)
+                    {
+                        if(!a.isselfsent)
+                        {
+                            log(0, "Delivered - " + b.str);
+                        }
+                        recv_count++;
+                        indeces.push_back(i);
+                        indeces.push_back(j);
+                    }
                 }
             }
         }
     }
-
-    /* Remove the sequencer message. */
-    if(print && index > -1) {
-        log(0, "Removing index " + itos(index) + ". Size: " + itos(message_vector.size()));        
-        message_vector.erase(message_vector.begin() + index);
-        log(0, "Removed index " + itos(index) + ". Size: " + itos(message_vector.size()));   
+    catch(int e)
+    {
+        //do nothing
     }
-
-    return print;
+        
+    for(int i = 0; i < indeces.size(); i++)
+        message_vector.erase(message_vector.begin() + indeces.at(i));
 }
 
 /* Function that inserts the message at the next possible index based on sort. */
 bool insert_message(message a) 
 {
-    bool isadded = false;
-    message b;
-    for(int i = 0; i < message_vector.size(); i++)
-    {  
-        /* Iterate and check where the item needs to be added then add. */
-        b = message_vector.at(i);
-        if(a.process == b.process && a.sendclock < b.sendclock) {
-            message_vector.insert(message_vector.begin() + i, a);
-            isadded = true;
-        }
-    }
-
-    if(!isadded)
-    {
-        /* If the item has not been added, add anyway. */
-        message_vector.push_back(a);
-        isadded = true;
-    }
-
-    return isadded;
+    message_vector.push_back(a);
+    return true;
 }
 
 /* Function that handles the timeout for the recv calls for 4 seconds. */
@@ -216,20 +200,10 @@ void *timer(void *args)
     {
         sleep(1);
         last_recv++;
-        if((!sequencer && last_recv >= 5) || (sequencer && last_recv >= 7))
+        if((!sequencer && last_recv >= 5) || (sequencer && last_recv >= 8))
         {
             end = 1;
         }
-    }
-
-    /* Print the buffered messages if the timeout was reached. */
-    message a;
-    for(int i = 0; i < message_vector.size(); i++) {
-        a = message_vector.at(i);
-        if(a.isseqmsg)
-            log(0, "Delivered - " + a.str);
-        else
-            log(0, "Delivered - " + itos(a.process) + ":" + itos(a.sendclock) + ":" + a.str);
     }
 
     /* Exit the program when the timeout is reached. */
@@ -262,7 +236,7 @@ void *sender(void *args)
     sleep(3);
     if(sequencer)
     {
-        sleep(1);
+        sleep(3);
         /* If the process is a sequencer, send the sequencing message. */
         while(1)
         {
@@ -270,8 +244,7 @@ void *sender(void *args)
             {
                 msg = message_vector.at(0);
                 clock_count++;
-                buffer_str = "SEQ:" + itos(clock_count) + ":" + itos(msg.process) + ":" + itos(msg.sendclock) + ":" + msg.str;
-                
+                buffer_str = "SEQ:" + itos(id) + ":" + itos(clock_count) + ":" + msg.addr + ":" + itos(msg.process) + ":" + itos(msg.sendclock) + ":" + msg.str;
                 /* Send the sequencer message. */
                 log(0, "Sending - " + buffer_str);
                 status = sendto(data->fd, buffer_str.c_str(), buffer_str.size(), 0, (struct sockaddr *)&group_address, sizeof(group_address));
@@ -292,7 +265,7 @@ void *sender(void *args)
         for(int i = 0; i < MESSAGE_COUNT; i++)
         {
             clock_count++;
-            buffer_str = itos(id) + ":" + itos(clock_count) + ":" + "MESSAGE_" + itos(i + 1);
+            buffer_str = addr_str + ":" + itos(id) + ":" + itos(clock_count) + ":" + "MESSAGE_" + itos(i + 1);
             /* Send the regular multicast message. */
             log(0, "Sending - " + buffer_str);
             status = sendto(data->fd, buffer_str.c_str(), buffer_str.size(), 0, (struct sockaddr *)&group_address, sizeof(group_address));
@@ -303,6 +276,62 @@ void *sender(void *args)
             }
         }
     }
+}
+
+void save_message(std::string buffer_str)
+{
+    /* Filter the messages from itself. */
+    bool isselfsent = buffer_str.find(":" + itos(id) + ":") != std::string::npos;
+    if(!isselfsent || !sequencer)
+    {
+        if(!ordered)
+        {
+            /* Print the message received from the multicast. */
+            if(!isselfsent)
+            {
+                clock_count++;
+                log(0, "Received and Delivered - " + buffer_str);
+            }   
+        }
+        else
+        {
+            /* Store the message to send later. */
+            message msg;
+            msg.isselfsent = isselfsent;
+            msg.selfclock = clock_count;
+
+            std::vector<std::string> tokens = split(buffer_str, ':');
+            if(tokens.size() == 4)
+            {
+                //if(!isselfsent) log(0, "Received - " + buffer_str);
+                /* Message from other clients. */
+                msg.addr = tokens.at(0);
+                msg.process = atoi(tokens.at(1).c_str());
+                msg.sendclock = atoi(tokens.at(2).c_str());
+                msg.isseqmsg = false;
+                msg.str = tokens.at(3);
+            }
+            else if(!sequencer)
+            {
+                //if(!isselfsent) log(0, "Received - " + buffer_str);
+                /* Message from the sequencer. */
+                msg.addr = "SEQ";
+                msg.process = atoi(tokens.at(1).c_str());
+                msg.sendclock = atoi(tokens.at(2).c_str());
+                msg.isseqmsg = true;
+                msg.str = tokens.at(3) + ":" + tokens.at(4) + ":" + tokens.at(5) + ":" + tokens.at(6);
+            }
+
+            /* Call the check for print to refresh message status. */
+            if(msg.str != "" && (id != msg.process || !sequencer)) {
+                insert_message(msg);
+                //log(0, "ADD MESSAGE" + buffer_str);
+            }
+        }
+    }
+
+    print_messages();
+    used_threads--;
 }
 
 /* Thread function that handles the listening to the other's messages. */
@@ -327,6 +356,8 @@ void *receiver(void *args)
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
 	address.sin_port = htons(data->port);
 
+    addr_str = inet_ntoa(address.sin_addr);
+
     /* Bind to the receiving address. */
     status = bind(data->fd, (struct sockaddr *)&address, sizeof(address));
     if(status < 0)
@@ -348,82 +379,29 @@ void *receiver(void *args)
 
     /* Variables for the thread. */
     socklen_t addr_length = sizeof(address);
-    char buffer[MAX_DATASIZE];
-    std::string buffer_str;
+    std::vector<buffer_data> buffers(data->groupsize);
+    std::vector<std::string> buffers_strs(data->groupsize);
+    pthread_t threads[data->groupsize];
+    int i = 0;
     
     while(1)
     {
         /* Wait to receive message from other processes. */
-        memset(&buffer[0], 0, MAX_DATASIZE);
-        status = recvfrom(data->fd, &buffer, MAX_DATASIZE, 0, (struct sockaddr *)&address, &addr_length);
+        if(i >= 5) i = 0;
+        memset(&(buffers[i].bfr), 0, MAX_DATASIZE);
+        status = recvfrom(data->fd, &(buffers[i].bfr), MAX_DATASIZE, 0, (struct sockaddr *)&address, &addr_length);
         if(status < 0)
         {
             log(1, "Exiting...");
             exit(1);
         }
 
-        /* Filter the messages from itself. */
-        last_recv = 0;
-        buffer[status] = '\0';
-        buffer_str = buffer;
-        if(buffer_str.find(itos(id) + ":") == std::string::npos)
-        {  
-            if(!ordered)
-            {
-                /* Print the message received from the multicast. */
-                clock_count++;
-                log(0, "Received and Delivered - " + buffer_str);
-            }
-            else
-            {
-                /* Store the message to send later. */
-                message msg;
-	            std::vector<std::string> tokens = split(buffer_str, ':');
-                
-                if(tokens.size() == 3)
-                {
-                    log(0, "Received - " + buffer_str);
-                    /* Message from other clients. */
-                    msg.process = atoi(tokens.at(0).c_str());
-                    msg.sendclock = atoi(tokens.at(1).c_str());
-                    msg.selfclock = clock_count;
-                    msg.delivered = false;
-                    msg.isseqmsg = false;
-                    msg.str = tokens.at(2);
-
-                    /* Print the message if it satisfies condition. */
-                    if(is_printable(msg))
-                    {
-                        log(0, "Delivered - " + buffer_str);
-                    }
-                    /* Else save the message to the buffer. */
-                    else 
-                    {
-                        insert_message(msg);
-                    }
-                }
-                else if(!sequencer)
-                {
-                    log(0, "Received - " + buffer_str);
-                    /* Message from the sequencer. */
-                    msg.process = -1;
-                    msg.sendclock = atoi(tokens.at(1).c_str());
-                    msg.selfclock = clock_count;
-                    msg.isseqmsg = true;
-                    msg.str = tokens.at(2) + ":" + tokens.at(3) + ":" + tokens.at(4);
-
-                    /* Print the message if it satisfies condition. */
-                    if(is_printable(msg))
-                    {
-                        log(0, "Delivered - " + msg.str);
-                    }
-                    /* Else save the message to the buffer. */
-                    else {
-                        insert_message(msg);
-                    }
-                }
-            }
-        }
+        /* Launch the thread for the received message. */
+        buffers[i].bfr[status] = '\0';
+        buffers_strs[i] = buffers[i].bfr;
+        save_message(buffers_strs[i]);
+        //pthread_create(&threads[used_threads], NULL, save_message, (void *) buffers_strs[i].c_str());
+        used_threads++;
     }
 }
 
@@ -479,7 +457,7 @@ int main(int argc, char **argv)
     pthread_create(&receive, NULL, receiver, data);  
     pthread_create(&timeout, NULL, timer, data);
 
-    /* Joing the two thread. */
+    /* Join the three threads. */
     pthread_join(send, NULL);
     pthread_join(receive, NULL);  
     pthread_join(timeout, NULL);  

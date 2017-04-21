@@ -47,188 +47,53 @@ The main issue I encountered was somehow getting unordered outputs when not usin
 
 ##### Assignment 2 Results
 `Non-ordered`:
-* When using the non-ordered version of the assignment, it was still tough to get the messages to be received out of order because of the fact that testing was done on the same computer. Every non-ordered run of the program resulting in the ordered delivery of the message. The output below shows the running of the non-ordered program with 5 processes.
-* Running `part_two.sh` like this `./part_two.sh 224.0.0.1 3003 5 N`, gave the following results:
+* When using the non-ordered version of the assignment, it was still tough to get the messages to be received out of order because of the fact that testing was done on the same computer. I even started one client on a different machine on the same network but the ordering of the messages were preserved. Every non-ordered run of the program resulted in the ordered delivery of the message. It was impossible to make the network itself deliver messages out of order. So even though no ordering was implemented, the delivery (printing) of the message was always in order.
+* The following is the output file from one of the processes the non-ordered program when running the bash script like so: `./part_two.sh 224.0.0.1 3003 3 N`. The process received messages from the other two processes but delivered every single one of them in order even though there was no sequencer algorithm in use. The messages have `sender_address`:`sender_process_id`:`sender_clock`:`sender_message_number` as the output.
 ```bash
-[11:02:58:157512][31058][Process] Process started.
-[11:02:58:157547][31059][Process] Process started.
-[11:02:58:157593][31057][Process] Process started.
-[11:02:58:157712][31060][Process] Process started.
-[11:02:58:158152][31061][Process] Process started.
-[11:03:01:157831][31059][Process] Sending - 31059:1:MESSAGE_1
-[11:03:01:157840][31058][Process] Sending - 31058:1:MESSAGE_1
-[11:03:01:157865][31057][Process] Sending - 31057:1:MESSAGE_1
-[11:03:01:157954][31060][Process] Sending - 31060:1:MESSAGE_1
-[11:03:01:158080][31058][Process] Sending - 31058:2:MESSAGE_2
-[11:03:01:158080][31059][Process] Sending - 31059:2:MESSAGE_2
-[11:03:01:158121][31060][Process] Sending - 31060:2:MESSAGE_2
-[11:03:01:158122][31061][Process] Received and Delivered - 31059:1:MESSAGE_1
-[11:03:01:158203][31058][Process] Sending - 31058:3:MESSAGE_3
-[11:03:01:158234][31061][Process] Received and Delivered - 31058:1:MESSAGE_1
-[11:03:01:158218][31059][Process] Sending - 31059:3:MESSAGE_3
-[11:03:01:158238][31060][Process] Sending - 31060:3:MESSAGE_3
-[11:03:01:158312][31058][Process] Sending - 31058:4:MESSAGE_4
-[11:03:01:158321][31061][Process] Received and Delivered - 31057:1:MESSAGE_1
-[11:03:01:158368][31060][Process] Sending - 31060:4:MESSAGE_4
-[11:03:01:158371][31059][Process] Sending - 31059:4:MESSAGE_4
-[11:03:01:158424][31058][Process] Sending - 31058:5:MESSAGE_5
-[11:03:01:158420][31061][Process] Sending - 31061:4:MESSAGE_1
-[11:03:01:158446][31057][Process] Sending - 31057:2:MESSAGE_2
-[11:03:01:158511][31060][Process] Sending - 31060:5:MESSAGE_5
-[11:03:01:158511][31059][Process] Sending - 31059:5:MESSAGE_5
-[11:03:01:158613][31057][Process] Sending - 31057:3:MESSAGE_3
-[11:03:01:158622][31061][Process] Sending - 31061:6:MESSAGE_2
-[11:03:01:158727][31057][Process] Sending - 31057:4:MESSAGE_4
-[11:03:01:158742][31061][Process] Sending - 31061:7:MESSAGE_3
-[11:03:01:158830][31061][Process] Sending - 31061:8:MESSAGE_4
-[11:03:01:158853][31057][Process] Sending - 31057:5:MESSAGE_5
-[11:03:01:158839][31060][Process] Received and Delivered - 31059:1:MESSAGE_1
-[11:03:01:158908][31061][Process] Sending - 31061:9:MESSAGE_5
-[11:02:58:157512][31058][Process] Process started.
-[11:02:58:157547][31059][Process] Process started.
-[11:02:58:157593][31057][Process] Process started.
-[11:02:58:157712][31060][Process] Process started.
-[11:02:58:158152][31061][Process] Process started.
-[11:03:01:157831][31059][Process] Sending - 31059:1:MESSAGE_1
-[11:03:01:157840][31058][Process] Sending - 31058:1:MESSAGE_1
-[11:03:01:157865][31057][Process] Sending - 31057:1:MESSAGE_1
-[11:03:01:157954][31060][Process] Sending - 31060:1:MESSAGE_1
-[11:03:01:158080][31058][Process] Sending - 31058:2:MESSAGE_2
-[11:03:01:158080][31059][Process] Sending - 31059:2:MESSAGE_2
-[11:03:01:158121][31060][Process] Sending - 31060:2:MESSAGE_2
-[11:03:01:158122][31061][Process] Received and Delivered - 31059:1:MESSAGE_1
-[11:03:01:158203][31058][Process] Sending - 31058:3:MESSAGE_3
-[11:03:01:158234][31061][Process] Received and Delivered - 31058:1:MESSAGE_1
-[11:03:01:158218][31059][Process] Sending - 31059:3:MESSAGE_3
-[11:03:01:158238][31060][Process] Sending - 31060:3:MESSAGE_3
-[11:03:01:158312][31058][Process] Sending - 31058:4:MESSAGE_4
-[11:03:01:158321][31061][Process] Received and Delivered - 31057:1:MESSAGE_1
-[11:03:01:158368][31060][Process] Sending - 31060:4:MESSAGE_4
-[11:03:01:158371][31059][Process] Sending - 31059:4:MESSAGE_4
-[11:03:01:158424][31058][Process] Sending - 31058:5:MESSAGE_5
-[11:03:01:158420][31061][Process] Sending - 31061:4:MESSAGE_1
-[11:03:01:158446][31057][Process] Sending - 31057:2:MESSAGE_2
-[11:03:01:158511][31060][Process] Sending - 31060:5:MESSAGE_5
-[11:03:01:158511][31059][Process] Sending - 31059:5:MESSAGE_5
-[11:03:01:158613][31057][Process] Sending - 31057:3:MESSAGE_3
-[11:03:01:158622][31061][Process] Sending - 31061:6:MESSAGE_2
-[11:03:01:158727][31057][Process] Sending - 31057:4:MESSAGE_4
-[11:03:01:158742][31061][Process] Sending - 31061:7:MESSAGE_3
-[11:03:01:158830][31061][Process] Sending - 31061:8:MESSAGE_4
-[11:03:01:158853][31057][Process] Sending - 31057:5:MESSAGE_5
-[11:03:01:158839][31060][Process] Received and Delivered - 31059:1:MESSAGE_1
-[11:03:01:158908][31061][Process] Sending - 31061:9:MESSAGE_5
-[11:03:01:160248][31058][Process] Received and Delivered - 31061:4:MESSAGE_1
-[11:03:01:160274][31057][Process] Received and Delivered - 31059:5:MESSAGE_5
-[11:03:01:160274][31059][Process] Received and Delivered - 31061:7:MESSAGE_3
-[11:03:01:160299][31060][Process] Received and Delivered - 31057:4:MESSAGE_4
-[11:03:01:160338][31058][Process] Received and Delivered - 31060:5:MESSAGE_5
-[11:03:01:160349][31059][Process] Received and Delivered - 31057:4:MESSAGE_4
-[11:03:01:160355][31057][Process] Received and Delivered - 31061:6:MESSAGE_2
-[11:03:01:160363][31060][Process] Received and Delivered - 31061:8:MESSAGE_4
-[11:03:01:160421][31058][Process] Received and Delivered - 31059:5:MESSAGE_5
-[11:03:01:160425][31059][Process] Received and Delivered - 31061:8:MESSAGE_4
-[11:03:01:160426][31057][Process] Received and Delivered - 31061:7:MESSAGE_3
-[11:03:01:160445][31060][Process] Received and Delivered - 31057:5:MESSAGE_5
-[11:03:01:160510][31059][Process] Received and Delivered - 31057:5:MESSAGE_5
-[11:03:01:160516][31057][Process] Received and Delivered - 31061:8:MESSAGE_4
-[11:03:01:160506][31058][Process] Received and Delivered - 31057:3:MESSAGE_3
-[11:03:01:160523][31060][Process] Received and Delivered - 31061:9:MESSAGE_5
-[11:03:01:160591][31059][Process] Received and Delivered - 31061:9:MESSAGE_5
-[11:03:01:160597][31057][Process] Received and Delivered - 31061:9:MESSAGE_5
-[11:03:01:160606][31058][Process] Received and Delivered - 31061:6:MESSAGE_2
-[11:03:01:160724][31058][Process] Received and Delivered - 31061:7:MESSAGE_3
-[11:03:01:160807][31058][Process] Received and Delivered - 31057:4:MESSAGE_4
-[11:03:01:160891][31058][Process] Received and Delivered - 31061:8:MESSAGE_4
-[11:03:01:160976][31058][Process] Received and Delivered - 31057:5:MESSAGE_5
-[11:03:01:161060][31058][Process] Received and Delivered - 31061:9:MESSAGE_5
-[11:03:06:158573][31058][Process] Exiting...
-[11:03:06:158573][31059][Process] Exiting...
-[11:03:06:158584][31057][Process] Exiting...
-[11:03:06:158584][31060][Process] Exiting...
-[11:03:06:159773][31061][Process] Exiting...
+[01:23:40:423514][11910][Process] Process started.
+[01:23:43:423694][11910][Process] Received and Delivered - 0.0.0.0:11908:1:MESSAGE_1
+[01:23:43:423818][11910][Process] Received and Delivered - 0.0.0.0:11909:1:MESSAGE_1
+[01:23:43:423896][11910][Process] Received and Delivered - 0.0.0.0:11908:2:MESSAGE_2
+[01:23:43:423981][11910][Process] Received and Delivered - 0.0.0.0:11909:2:MESSAGE_2
+[01:23:43:424061][11910][Process] Received and Delivered - 0.0.0.0:11908:4:MESSAGE_3
+[01:23:43:424117][11910][Process] Sending - 0.0.0.0:11910:6:MESSAGE_1
+[01:23:43:424117][11910][Process] Sending - 0.0.0.0:11910:6:MESSAGE_1
+[01:23:43:424150][11910][Process] Received and Delivered - 0.0.0.0:11909:3:MESSAGE_3
+[01:23:43:424367][11910][Process] Sending - 0.0.0.0:11910:8:MESSAGE_2
+[01:23:43:424513][11910][Process] Sending - 0.0.0.0:11910:9:MESSAGE_3
+[01:23:48:424629][11910][Process] Exiting...
+
 ```
 
 `Ordered`:
-* The ordered version guaranteed the correct delivery of the messages. But as expected, this version took more CPU and Memory usage and was a little slower. When using the ordered version of the assignment, the processes were synchronized with the messages by the sequencer and then they would print the message. This was evident from the results below. The messages that were sent were stored in the buffer until both the message and the sequencer's bersion of the message were received.
-* Running `part_two.sh` like this `./part_two.sh 224.0.0.1 3003 3 Y`, gave the following results:
+* The ordered version guaranteed the correct delivery of the messages. But as expected, this version took more CPU and Memory usage and was a little slower. When using the ordered version of the assignment, the processes were synchronized with the messages by the sequencer and then they would print the message. This was evident from the results below. The messages that were sent were stored in the buffer until both the message and the sequencer's version of the message were received and the process sequence number was the global sequencer number minus 1. 
+* The following is the output from all the processes in the ordered program when running the bash script like so: `./part_two.sh 224.0.0.1 3003 3 Y`. The processes were coded to send 3 messages each. The submitted assignment sends 5 messages each. The messages have `sender_address`:`sender_process_id`:`sender_clock`:`sender_message_number` as the output.
 ```bash
-[11:08:26:335051][31286][Sequencer] Process started.
-[11:08:26:335153][31288][Process] Process started.
-[11:08:26:335734][31287][Process] Process started.
-[11:08:29:335420][31288][Process] Sending - 31288:1:MESSAGE_1
-[11:08:29:335753][31287][Process] Received - 31288:1:MESSAGE_1
-[11:08:29:335761][31286][Sequencer] Received - 31288:1:MESSAGE_1
-[11:08:29:335982][31288][Process] Sending - 31288:2:MESSAGE_2
-[11:08:29:336055][31287][Process] Sending - 31287:1:MESSAGE_1
-[11:08:29:336176][31287][Process] Received - 31288:2:MESSAGE_2
-[11:08:29:336192][31288][Process] Sending - 31288:3:MESSAGE_3
-[11:08:29:336194][31286][Sequencer] Received - 31288:2:MESSAGE_2
-[11:08:29:336262][31287][Process] Sending - 31287:2:MESSAGE_2
-[11:08:29:336262][31288][Process] Received - 31287:1:MESSAGE_1
-[11:08:29:336323][31286][Sequencer] Received - 31287:1:MESSAGE_1
-[11:08:29:336344][31288][Process] Sending - 31288:4:MESSAGE_4
-[11:08:29:336406][31287][Process] Sending - 31287:3:MESSAGE_3
-[11:08:29:336428][31286][Sequencer] Received - 31288:3:MESSAGE_3
-[11:08:29:336406][31288][Process] Received - 31287:2:MESSAGE_2
-[11:08:29:336479][31288][Process] Sending - 31288:5:MESSAGE_5
-[11:08:29:336545][31286][Sequencer] Received - 31287:2:MESSAGE_2
-[11:08:29:336557][31287][Process] Sending - 31287:4:MESSAGE_4
-[11:08:29:336558][31288][Process] Received - 31287:3:MESSAGE_3
-[11:08:29:336645][31286][Sequencer] Received - 31288:4:MESSAGE_4
-[11:08:29:336638][31287][Process] Received - 31288:3:MESSAGE_3
-[11:08:29:336673][31288][Process] Received - 31287:4:MESSAGE_4
-[11:08:29:336673][31287][Process] Sending - 31287:5:MESSAGE_5
-[11:08:29:336745][31286][Sequencer] Received - 31287:3:MESSAGE_3
-[11:08:29:336776][31287][Process] Received - 31288:4:MESSAGE_4
-[11:08:29:336811][31288][Process] Received - 31287:5:MESSAGE_5
-[11:08:29:336848][31286][Sequencer] Received - 31288:5:MESSAGE_5
-[11:08:29:336902][31287][Process] Received - 31288:5:MESSAGE_5
-[11:08:29:336956][31286][Sequencer] Received - 31287:4:MESSAGE_4
-[11:08:29:337067][31286][Sequencer] Received - 31287:5:MESSAGE_5
-[11:08:30:335475][31286][Sequencer] Sending - SEQ:1:31288:1:MESSAGE_1
-[11:08:30:335731][31286][Sequencer] Sending - SEQ:2:31288:2:MESSAGE_2
-[11:08:30:335726][31287][Process] Received - SEQ:1:31288:1:MESSAGE_1
-[11:08:30:335750][31286][Sequencer] Received - SEQ:1:31288:1:MESSAGE_1
-[11:08:30:335896][31287][Process] Received - SEQ:2:31288:2:MESSAGE_2
-[11:08:30:335942][31286][Sequencer] Received - SEQ:2:31288:2:MESSAGE_2
-[11:08:30:335961][31286][Sequencer] Sending - SEQ:3:31287:1:MESSAGE_1
-[11:08:30:336145][31286][Sequencer] Received - SEQ:3:31287:1:MESSAGE_1
-[11:08:30:336163][31288][Process] Received - SEQ:3:31287:1:MESSAGE_1
-[11:08:30:336302][31286][Sequencer] Sending - SEQ:4:31288:3:MESSAGE_3
-[11:08:30:336501][31286][Sequencer] Sending - SEQ:5:31287:2:MESSAGE_2
-[11:08:30:336481][31287][Process] Received - SEQ:4:31288:3:MESSAGE_3
-[11:08:30:336533][31286][Sequencer] Received - SEQ:4:31288:3:MESSAGE_3
-[11:08:30:336633][31286][Sequencer] Sending - SEQ:6:31288:4:MESSAGE_4
-[11:08:30:336647][31288][Process] Received - SEQ:5:31287:2:MESSAGE_2
-[11:08:30:336704][31286][Sequencer] Received - SEQ:5:31287:2:MESSAGE_2
-[11:08:30:336766][31286][Sequencer] Sending - SEQ:7:31287:3:MESSAGE_3
-[11:08:30:336809][31287][Process] Received - SEQ:6:31288:4:MESSAGE_4
-[11:08:30:336828][31286][Sequencer] Received - SEQ:6:31288:4:MESSAGE_4
-[11:08:30:336898][31286][Sequencer] Sending - SEQ:8:31288:5:MESSAGE_5
-[11:08:30:336920][31288][Process] Received - SEQ:7:31287:3:MESSAGE_3
-[11:08:30:336942][31286][Sequencer] Received - SEQ:7:31287:3:MESSAGE_3
-[11:08:30:337036][31286][Sequencer] Sending - SEQ:9:31287:4:MESSAGE_4
-[11:08:30:337059][31286][Sequencer] Received - SEQ:8:31288:5:MESSAGE_5
-[11:08:30:337081][31287][Process] Received - SEQ:8:31288:5:MESSAGE_5
-[11:08:30:337212][31286][Sequencer] Sending - SEQ:10:31287:5:MESSAGE_5
-[11:08:30:337232][31286][Sequencer] Received - SEQ:9:31287:4:MESSAGE_4
-[11:08:30:337370][31286][Sequencer] Received - SEQ:10:31287:5:MESSAGE_5
-[11:08:30:337264][31288][Process] Received - SEQ:9:31287:4:MESSAGE_4
-[11:08:30:337687][31288][Process] Received - SEQ:10:31287:5:MESSAGE_5
-[11:08:35:336034][31288][Process] Delivered - 31287:1:MESSAGE_1
-[11:08:35:336082][31288][Process] Delivered - 31287:2:MESSAGE_2
-[11:08:35:336095][31288][Process] Delivered - 31287:3:MESSAGE_3
-[11:08:35:336107][31288][Process] Delivered - 31287:4:MESSAGE_4
-[11:08:35:336116][31288][Process] Delivered - 31287:5:MESSAGE_5
-[11:08:35:336124][31288][Process] Exiting...
-[11:08:35:336663][31287][Process] Delivered - 31288:1:MESSAGE_1
-[11:08:35:336691][31287][Process] Delivered - 31288:2:MESSAGE_2
-[11:08:35:336703][31287][Process] Delivered - 31288:3:MESSAGE_3
-[11:08:35:336714][31287][Process] Delivered - 31288:4:MESSAGE_4
-[11:08:35:336721][31287][Process] Delivered - 31288:5:MESSAGE_5
-[11:08:35:336731][31287][Process] Exiting...
-[11:08:37:336065][31286][Sequencer] Exiting...
+[01:19:59:686962][11518][Sequencer] Process started.
+[01:19:59:687106][11519][Process] Process started.
+[01:19:59:687416][11520][Process] Process started.
+[01:20:02:687891][11520][Process] Sending - 0.0.0.0:11520:1:MESSAGE_1
+[01:20:02:687903][11519][Process] Sending - 0.0.0.0:11519:1:MESSAGE_1
+[01:20:02:688113][11520][Process] Sending - 0.0.0.0:11520:2:MESSAGE_2
+[01:20:02:688306][11519][Process] Sending - 0.0.0.0:11519:2:MESSAGE_2
+[01:20:02:688319][11520][Process] Sending - 0.0.0.0:11520:3:MESSAGE_3
+[01:20:02:688431][11519][Process] Sending - 0.0.0.0:11519:3:MESSAGE_3
+[01:20:05:687990][11518][Sequencer] Sending - SEQ:11518:1:0.0.0.0:11519:1:MESSAGE_1
+[01:20:05:688264][11520][Process] Delivered - 0.0.0.0:11519:1:MESSAGE_1
+[01:20:05:688402][11518][Sequencer] Sending - SEQ:11518:2:0.0.0.0:11520:1:MESSAGE_1
+[01:20:05:688568][11518][Sequencer] Sending - SEQ:11518:3:0.0.0.0:11520:2:MESSAGE_2
+[01:20:05:688624][11519][Process] Delivered - 0.0.0.0:11520:1:MESSAGE_1
+[01:20:05:688721][11518][Sequencer] Sending - SEQ:11518:4:0.0.0.0:11519:2:MESSAGE_2
+[01:20:05:688871][11519][Process] Delivered - 0.0.0.0:11520:2:MESSAGE_2
+[01:20:05:688884][11518][Sequencer] Sending - SEQ:11518:5:0.0.0.0:11520:3:MESSAGE_3
+[01:20:05:688943][11520][Process] Delivered - 0.0.0.0:11519:2:MESSAGE_2
+[01:20:05:689029][11518][Sequencer] Sending - SEQ:11518:6:0.0.0.0:11519:3:MESSAGE_3
+[01:20:05:689099][11519][Process] Delivered - 0.0.0.0:11520:3:MESSAGE_3
+[01:20:05:689220][11520][Process] Delivered - 0.0.0.0:11519:3:MESSAGE_3
+[01:20:10:688668][11520][Process] Exiting...
+[01:20:10:689291][11519][Process] Exiting...
+[01:20:13:689316][11518][Sequencer] Exiting...
 ```
 
 #### Assignment 3
+The design of the third assignment is also in a different program. The program

@@ -1,7 +1,7 @@
 #	Sabin Raj Tiwari
 #	CMSC 621
 #	Project 2
-#	Assignment 1=2
+#	Assignment 2
 
 HOST=$1
 PORT=$2

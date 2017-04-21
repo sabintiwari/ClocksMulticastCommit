@@ -41,8 +41,8 @@ part_two.sh 224.0.0.1 3000 5 N
 ```
 If `ordering_flag` is set to `Y`, then the script will run a sequencer and `group_size - 1` number client processes. If `ordering_flag` is set to `N`, then the script will run `group_size` number of client processes that multicast to each other. The logs from the program will be shown for each process in the terminal as well as the `logs` directory.
 
-###### Assignment 3 ():
+###### Assignment 3 (parameters: `multicast_group_address`, `port_number`, `group_size`):
 ```bash
-part_three.sh
+part_three.sh 224.0.0.1 3000 5
 ```
-
+The script runs `groupsize - 1` client processes that will try to read and write to the file. It will also execute a process that will give read and write access to the other processes.
