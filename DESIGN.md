@@ -96,7 +96,7 @@ The main issue I encountered was somehow getting unordered outputs when not usin
 ```
 
 #### Assignment 3 `part_three.cpp`
-The design of the third assignment is also in a different program. The program uses `pthread` library to handle access to the file. First of all, when the survey started, it waits for a connection coming from the client then starts a thread to handle the file lock for the specific client. The thread uses `pthread_mutex` and `pthread_cond` to lock a variable that will be used to give access to the thread to send the client that it's handling an `OK` to read and write to the file. Then the client that receives the `OK` will read the file, update the value, write to the file, and send a message to the server to signal that it has finished. Then the server will give access to the next thread that is waiting.
+The design of the third assignment is also in a different program. The program uses `pthread` library to handle access to the file. First of all, when the sever starts, it waits for a connection coming from the client then starts a thread to handle the file lock for the specific client. The thread uses `pthread_mutex` and `pthread_cond` to lock a variable that will be used to give access to the thread. The thread will notify the client with an `OK` to read and write to the file. Then the client that receives the `OK` will read the file, update the value, write to the file, and send a message to the server to signal that it has finished. Then the server will give access to the next thread that is waiting.
 * The following is the output from all the clients and the server when running like so: `./part_three.sh localhost 3005 5`.
 
 ```bash
