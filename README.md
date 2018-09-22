@@ -1,4 +1,4 @@
-## Clocks, Multicast, and Commit | Sabin Raj Tiwari | CMSC 621 Project 2
+## Clocks, Multicast, and Commit | Sabin Raj Tiwari
 
 ***
 #### Make
